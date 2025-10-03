@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguimiento de Remitos</title>
+    <!-- Tailwind CSS para un diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter para una tipografía limpia -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        /* Estilos personalizados para mejorar la estética */
+        .sidebar-link {
+            transition: all 0.2s ease-in-out;
+        }
+        .sidebar-link:hover, .sidebar-link.active {
+            background-color: #3b82f6; /* Azul más intenso al pasar el mouse o al estar activo */
+            color: white;
+        }
+        .table-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        /* Estilo para el scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .status-pendiente { background-color: #fef9c3; color: #854d0e; }
+        .status-en-camino { background-color: #cffafe; color: #0891b2; }
+        .status-entregado { background-color: #dcfce7; color: #166534; }
+        .status-cancelado { background-color: #fee2e2; color: #991b1b; }
+        
+        .status-select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.25em 1.25em;
+            padding-right: 2.5rem;
+            border: 1px solid transparent;
+            transition: border-color .2s;
+        }
+        .status-select:hover {
+            border-color: rgba(0,0,0,0.1);
+        }
+
+        /* Estilos para notificaciones y modales */
+        #toast-notification {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        #confirm-modal-overlay {
+            transition: opacity 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans overflow-hidden">
+    <div class="relative min-h-screen md:flex">
+        <!-- Overlay para sidebar móvil -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
+
+        <!-- Barra Lateral de Navegación -->
+        <aside id="sidebar" class="w-64 bg-gray-800 text-white flex-col z-40 fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out flex">
+            <div class="p-6 text-2xl font-bold border-b border-gray-700 flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-8 w-8 text-blue-400"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" x2="4" y1="22" y2="15"></line></svg>
+                <span>LG</span>
+            </div>
+            <nav class="flex-1 p-4">
+                <a href="#" data-page="dashboard" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="3" y="15" rx="1"></rect><rect width="7" height="5" x="14" y="13" rx="1"></rect></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" data-page="carga" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                    <span>Cargar Remito</span>
+                </a>
+                <a href="#" data-page="consulta" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <span>Consultar Remitos</span>
+                </a>
+                 <a href="#" data-page="configuracion" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <span>Configuración</span>
+                </a>
+            </nav>
+            <div class="p-4 border-t border-gray-700 text-xs text-gray-400">
+                <p>&copy; 2024 - Creado por Gemini</p>
+                <p>Las Parejas, Santa Fe</p>
+            </div>
+        </aside>
+
+        <!-- Contenido Principal -->
+        <div class="flex-1 flex flex-col w-full">
+             <!-- Cabecera para móvil -->
+            <header class="md:hidden bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+                 <h1 id="mobile-header-title" class="text-xl font-bold text-gray-800">Dashboard</h1>
+                <button id="menu-toggle-btn" class="text-gray-700 p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+            </header>
+            <main class="flex-1 p-4 md:p-10 overflow-y-auto">
+
+            <!-- Página: Dashboard -->
+            <div id="dashboard-page" class="page">
+                <h1 class="text-3xl font-bold text-gray-800 mb-6 hidden md:block">Dashboard</h1>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Remitos Pendientes</p>
+                            <p id="kpi-pendientes" class="text-3xl font-bold text-yellow-600">0</p>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-yellow-600"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                    </div>
+                     <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">En Camino</p>
+                            <p id="kpi-en-camino" class="text-3xl font-bold text-cyan-600">0</p>
+                        </div>
+                         <div class="bg-cyan-100 p-3 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-cyan-600"><path d="M5 18H3c-1.1 0-2-.9-2-2V8c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v1c0 .5-.2 1-.6 1.4L10 16H5z"></path><path d="M17 18h2c1.1 0 2-.9 2-2v-4c0-1.1-.9-2-2-2h-1"></path><circle cx="7.5" cy="17.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Entregados (Total)</p>
+                            <p id="kpi-entregados" class="text-3xl font-bold text-green-600">0</p>
+                        </div>
+                         <div class="bg-green-100 p-3 rounded-full">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-green-600"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500">Total Registrados</p>
+                            <p id="kpi-total" class="text-3xl font-bold text-gray-800">0</p>
+                        </div>
+                        <div class="bg-gray-200 p-3 rounded-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-800"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">Últimos Remitos Cargados</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left min-w-[600px]">
+                           <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="p-3 font-semibold text-gray-600">N° Remito</th>
+                                    <th class="p-3 font-semibold text-gray-600">Cliente</th>
+                                    <th class="p-3 font-semibold text-gray-600">Fecha Emisión</th>
+                                    <th class="p-3 font-semibold text-gray-600">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-table-body">
+                                <!-- Filas de la tabla del dashboard se insertarán aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Página: Cargar Remito -->
+            <div id="carga-page" class="page hidden">
+                <h1 class="text-3xl font-bold text-gray-800 mb-6 hidden md:block">Cargar Nuevo Remito</h1>
+                <div class="bg-white p-6 md:p-8 rounded-xl shadow-md max-w-2xl mx-auto">
+                    <form id="form-carga" class="space-y-6">
+                        <div>
+                            <label for="remito-nro" class="block text-sm font-medium text-gray-700 mb-1">N° Remito</label>
+                            <input type="text" id="remito-nro" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="remito-fecha-emision" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Emisión</label>
+                                <input type="date" id="remito-fecha-emision" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="remito-cliente" class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                                <select id="remito-cliente" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                    <!-- Opciones de cliente se insertarán aquí -->
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="remito-destino" class="block text-sm font-medium text-gray-700 mb-1">Destino</label>
+                            <input type="text" id="remito-destino" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="remito-estado" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                            <select id="remito-estado" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                 <!-- Opciones de estado se insertarán aquí -->
+                            </select>
+                        </div>
+                         <div>
+                            <label for="remito-observaciones" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                            <textarea id="remito-observaciones" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        </div>
+                        <div class="flex justify-end pt-4">
+                            <button type="submit" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                Guardar Remito
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Página: Consultar Remitos -->
+            <div id="consulta-page" class="page hidden">
+                <h1 class="text-3xl font-bold text-gray-800 mb-6 hidden md:block">Consulta de Remitos</h1>
+                <div class="bg-white p-4 md:p-6 rounded-xl shadow-md">
+                     <div class="flex justify-between items-center mb-4">
+                        <div class="relative w-full max-w-xs">
+                            <input type="text" id="search-input" placeholder="Buscar..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            </div>
+                        </div>
+                     </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left table-auto min-w-[700px]">
+                            <thead class="bg-gray-100 table-header">
+                                <tr>
+                                    <th class="p-4 font-bold text-gray-700">N° Remito</th>
+                                    <th class="p-4 font-bold text-gray-700">Fecha</th>
+                                    <th class="p-4 font-bold text-gray-700">Cliente</th>
+                                    <th class="p-4 font-bold text-gray-700">Destino</th>
+                                    <th class="p-4 font-bold text-gray-700">Estado</th>
+                                    <th class="p-4 font-bold text-gray-700 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="consulta-table-body" class="divide-y">
+                                <!-- Filas de la tabla de consulta se insertarán aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Página: Configuración -->
+            <div id="configuracion-page" class="page hidden">
+                <h1 class="text-3xl font-bold text-gray-800 mb-6 hidden md:block">Configuración</h1>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Configuración de Clientes -->
+                    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md">
+                        <h2 class="text-xl font-bold text-gray-700 mb-4">Gestionar Clientes</h2>
+                        <form id="form-add-cliente" class="flex gap-2 mb-4">
+                            <input type="text" id="new-cliente-input" placeholder="Nuevo cliente" required class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Agregar</button>
+                        </form>
+                        <ul id="clientes-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                           <!-- Lista de clientes se insertará aquí -->
+                        </ul>
+                    </div>
+                    <!-- Configuración de Estados -->
+                    <div class="bg-white p-6 md:p-8 rounded-xl shadow-md">
+                        <h2 class="text-xl font-bold text-gray-700 mb-4">Gestionar Estados</h2>
+                         <form id="form-add-estado" class="flex gap-2 mb-4">
+                            <input type="text" id="new-estado-input" placeholder="Nuevo estado" required class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Agregar</button>
+                        </form>
+                        <ul id="estados-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            <!-- Lista de estados se insertará aquí -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Notificación Toast -->
+    <div id="toast-notification" class="fixed top-5 right-5 bg-white shadow-lg rounded-lg p-4 flex items-center gap-4 z-50 transform translate-x-[120%] opacity-0">
+        <div id="toast-icon"></div>
+        <p id="toast-message" class="text-gray-800"></p>
+    </div>
+    
+    <!-- Modal de Confirmación -->
+    <div id="confirm-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden opacity-0">
+        <div id="confirm-modal" class="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full">
+            <h3 id="confirm-title" class="text-xl font-bold text-gray-800 mb-4">Confirmar Acción</h3>
+            <p id="confirm-message" class="text-gray-600 mb-6">¿Estás seguro?</p>
+            <div class="flex justify-end gap-4">
+                <button id="confirm-cancel-btn" class="px-6 py-2 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300 transition-colors">Cancelar</button>
+                <button id="confirm-ok-btn" class="px-6 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ESTADO DE LA APLICACIÓN ---
+            let state = {
+                remitos: [],
+                clientes: ['Cliente A', 'Cliente B', 'Cliente C'],
+                estados: ['Pendiente', 'En Camino', 'Entregado', 'Cancelado'],
+            };
+
+            // --- SELECTORES DEL DOM ---
+            const pages = document.querySelectorAll('.page');
+            const navLinks = document.querySelectorAll('.sidebar-link');
+            const formCarga = document.getElementById('form-carga');
+            const consultaTableBody = document.getElementById('consulta-table-body');
+            const dashboardTableBody = document.getElementById('dashboard-table-body');
+            const searchInput = document.getElementById('search-input');
+            const mobileHeaderTitle = document.getElementById('mobile-header-title');
+
+            // Selectores para móvil
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
+            const menuToggleBtn = document.getElementById('menu-toggle-btn');
+            
+            const kpiPendientes = document.getElementById('kpi-pendientes');
+            const kpiEnCamino = document.getElementById('kpi-en-camino');
+            const kpiEntregados = document.getElementById('kpi-entregados');
+            const kpiTotal = document.getElementById('kpi-total');
+
+            const formAddCliente = document.getElementById('form-add-cliente');
+            const newClienteInput = document.getElementById('new-cliente-input');
+            const clientesList = document.getElementById('clientes-list');
+            
+            const formAddEstado = document.getElementById('form-add-estado');
+            const newEstadoInput = document.getElementById('new-estado-input');
+            const estadosList = document.getElementById('estados-list');
+
+            // Selectores de notificaciones
+            const toast = document.getElementById('toast-notification');
+            const toastIcon = document.getElementById('toast-icon');
+            const toastMessage = document.getElementById('toast-message');
+            const confirmModalOverlay = document.getElementById('confirm-modal-overlay');
+            const confirmMessage = document.getElementById('confirm-message');
+            const confirmOkBtn = document.getElementById('confirm-ok-btn');
+            const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+
+
+            // --- FUNCIONES DE NOTIFICACIÓN ---
+            const showToast = (message, type = 'success') => {
+                toastMessage.textContent = message;
+                if (type === 'success') {
+                    toast.classList.remove('bg-red-100');
+                    toast.classList.add('bg-green-100');
+                    toastIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-green-600"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+                } else { // error
+                    toast.classList.remove('bg-green-100');
+                    toast.classList.add('bg-red-100');
+                    toastIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-red-600"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+                }
+                toast.classList.remove('translate-x-[120%]', 'opacity-0');
+                toast.classList.add('translate-x-0', 'opacity-100');
+                
+                setTimeout(() => {
+                    toast.classList.remove('translate-x-0', 'opacity-100');
+                    toast.classList.add('translate-x-[120%]', 'opacity-0');
+                }, 3000);
+            };
+
+            const showConfirmModal = (message, onConfirm) => {
+                confirmMessage.textContent = message;
+                confirmModalOverlay.classList.remove('hidden');
+                setTimeout(() => confirmModalOverlay.classList.remove('opacity-0'), 10);
+
+                const handleConfirm = () => {
+                    onConfirm();
+                    hideConfirm();
+                };
+                
+                const hideConfirm = () => {
+                    confirmModalOverlay.classList.add('opacity-0');
+                    setTimeout(() => confirmModalOverlay.classList.add('hidden'), 200);
+                    confirmOkBtn.removeEventListener('click', handleConfirm);
+                    confirmCancelBtn.removeEventListener('click', hideConfirm);
+                };
+
+                confirmOkBtn.addEventListener('click', handleConfirm);
+                confirmCancelBtn.addEventListener('click', hideConfirm);
+            };
+
+            // --- FUNCIONES DE PERSISTENCIA ---
+            const saveData = () => {
+                localStorage.setItem('remitosData', JSON.stringify(state));
+            };
+
+            const loadData = () => {
+                const data = localStorage.getItem('remitosData');
+                if (data) {
+                    state = JSON.parse(data);
+                } else {
+                    // Cargar datos de ejemplo si no hay nada guardado
+                    state.remitos = [
+                        { id: 'R001', fechaEmision: '2024-10-01', cliente: 'Cliente A', destino: 'Rosario, SF', estado: 'Entregado', observaciones: 'Entregado en tiempo y forma.' },
+                        { id: 'R002', fechaEmision: '2024-10-02', cliente: 'Cliente B', destino: 'Córdoba, CBA', estado: 'En Camino', observaciones: 'Demorado por mal clima.' },
+                        { id: 'R003', fechaEmision: '2024-10-03', cliente: 'Cliente C', destino: 'Buenos Aires, BA', estado: 'Pendiente', observaciones: 'Esperando stock de producto.' },
+                    ];
+                }
+            };
+            
+            // --- FUNCIONES DE RENDERIZADO ---
+            const getStatusBadge = (status) => {
+                const normalizedStatus = status.toLowerCase().replace(/\s/g, '-');
+                return `<span class="status-badge status-${normalizedStatus}">${status}</span>`;
+            };
+
+            const renderConsultaTable = (remitosToShow) => {
+                consultaTableBody.innerHTML = '';
+                if(remitosToShow.length === 0) {
+                    consultaTableBody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-gray-500">No se encontraron remitos.</td></tr>`;
+                    return;
+                }
+                remitosToShow.forEach(remito => {
+                    const row = document.createElement('tr');
+                    const normalizedStatus = remito.estado.toLowerCase().replace(/\s/g, '-');
+                    row.className = 'hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="p-4 font-medium text-gray-800">${remito.id}</td>
+                        <td class="p-4 text-gray-600">${new Date(remito.fechaEmision + 'T00:00:00').toLocaleDateString()}</td>
+                        <td class="p-4 text-gray-600">${remito.cliente}</td>
+                        <td class="p-4 text-gray-600">${remito.destino}</td>
+                        <td class="p-4">
+                            <select data-id="${remito.id}" class="status-select status-badge ${'status-' + normalizedStatus} cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                ${state.estados.map(s => `<option class="bg-white text-gray-800" value="${s}" ${s === remito.estado ? 'selected' : ''}>${s}</option>`).join('')}
+                            </select>
+                        </td>
+                        <td class="p-4 text-right">
+                            <button data-id="${remito.id}" class="delete-btn text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </td>
+                    `;
+                    consultaTableBody.appendChild(row);
+                });
+            };
+
+            const renderDashboard = () => {
+                // KPIs
+                const pendientes = state.remitos.filter(r => r.estado === 'Pendiente').length;
+                const enCamino = state.remitos.filter(r => r.estado === 'En Camino').length;
+                const entregados = state.remitos.filter(r => r.estado === 'Entregado').length;
+                
+                kpiPendientes.textContent = pendientes;
+                kpiEnCamino.textContent = enCamino;
+                kpiEntregados.textContent = entregados;
+                kpiTotal.textContent = state.remitos.length;
+                
+                // Tabla de últimos remitos
+                dashboardTableBody.innerHTML = '';
+                const ultimosRemitos = [...state.remitos].reverse().slice(0, 5);
+                if(ultimosRemitos.length === 0) {
+                     dashboardTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-8 text-gray-500">Aún no hay remitos cargados.</td></tr>`;
+                }
+                ultimosRemitos.forEach(remito => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b';
+                    row.innerHTML = `
+                        <td class="p-3 font-medium">${remito.id}</td>
+                        <td class="p-3">${remito.cliente}</td>
+                        <td class="p-3">${new Date(remito.fechaEmision + 'T00:00:00').toLocaleDateString()}</td>
+                        <td class="p-3">${getStatusBadge(remito.estado)}</td>
+                    `;
+                    dashboardTableBody.appendChild(row);
+                });
+            };
+            
+            const populateSelects = () => {
+                const clienteSelect = document.getElementById('remito-cliente');
+                const estadoSelect = document.getElementById('remito-estado');
+                clienteSelect.innerHTML = '<option value="">Seleccione un cliente</option>';
+                estadoSelect.innerHTML = '<option value="">Seleccione un estado</option>';
+
+                state.clientes.forEach(cliente => {
+                    clienteSelect.innerHTML += `<option value="${cliente}">${cliente}</option>`;
+                });
+                state.estados.forEach(estado => {
+                    estadoSelect.innerHTML += `<option value="${estado}">${estado}</option>`;
+                });
+            };
+            
+            const renderConfigLists = () => {
+                clientesList.innerHTML = '';
+                state.clientes.forEach(cliente => {
+                    clientesList.innerHTML += `
+                        <li class="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
+                            <span>${cliente}</span>
+                            <button data-cliente="${cliente}" class="delete-cliente-btn text-gray-400 hover:text-red-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </li>`;
+                });
+                
+                estadosList.innerHTML = '';
+                state.estados.forEach(estado => {
+                    estadosList.innerHTML += `
+                        <li class="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
+                            ${getStatusBadge(estado)}
+                            <button data-estado="${estado}" class="delete-estado-btn text-gray-400 hover:text-red-600">
+                               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </li>`;
+                });
+            };
+
+            const updateAll = () => {
+                saveData();
+                const currentSearch = searchInput.value.toLowerCase();
+                const filteredRemitos = state.remitos.filter(r =>
+                    r.id.toLowerCase().includes(currentSearch) ||
+                    r.cliente.toLowerCase().includes(currentSearch) ||
+                    r.destino.toLowerCase().includes(currentSearch)
+                );
+                renderConsultaTable(filteredRemitos);
+                renderDashboard();
+                populateSelects();
+                renderConfigLists();
+            };
+
+            const toggleSidebar = () => {
+                sidebar.classList.toggle('-translate-x-full');
+                sidebarOverlay.classList.toggle('hidden');
+            };
+
+            // --- MANEJO DE NAVEGACIÓN ---
+            const navigateTo = (pageId) => {
+                pages.forEach(page => page.classList.add('hidden'));
+                document.getElementById(`${pageId}-page`).classList.remove('hidden');
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.dataset.page === pageId) {
+                        link.classList.add('active');
+                        mobileHeaderTitle.textContent = link.querySelector('span').textContent;
+                    }
+                });
+                 if (window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) {
+                    toggleSidebar();
+                 }
+            };
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navigateTo(link.dataset.page);
+                });
+            });
+
+            // --- MANEJADORES DE EVENTOS ---
+            menuToggleBtn.addEventListener('click', toggleSidebar);
+            sidebarOverlay.addEventListener('click', toggleSidebar);
+
+            formCarga.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const newRemito = {
+                    id: document.getElementById('remito-nro').value,
+                    fechaEmision: document.getElementById('remito-fecha-emision').value,
+                    cliente: document.getElementById('remito-cliente').value,
+                    destino: document.getElementById('remito-destino').value,
+                    estado: document.getElementById('remito-estado').value,
+                    observaciones: document.getElementById('remito-observaciones').value,
+                };
+                
+                if (state.remitos.some(r => r.id === newRemito.id)) {
+                    showToast('Error: El número de remito ya existe.', 'error');
+                    return;
+                }
+
+                state.remitos.push(newRemito);
+                formCarga.reset();
+                updateAll();
+                showToast('Remito guardado con éxito!');
+                navigateTo('consulta');
+            });
+            
+            consultaTableBody.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (deleteBtn) {
+                    const idToDelete = deleteBtn.dataset.id;
+                    const onConfirm = () => {
+                        state.remitos = state.remitos.filter(r => r.id !== idToDelete);
+                        updateAll();
+                        showToast(`Remito ${idToDelete} eliminado.`, 'success');
+                    };
+                    showConfirmModal(`¿Estás seguro de que deseas eliminar el remito ${idToDelete}?`, onConfirm);
+                }
+            });
+
+            consultaTableBody.addEventListener('change', (e) => {
+                if (e.target.classList.contains('status-select')) {
+                    const idToUpdate = e.target.dataset.id;
+                    const newStatus = e.target.value;
+                    const remitoToUpdate = state.remitos.find(r => r.id === idToUpdate);
+                    if (remitoToUpdate) {
+                        remitoToUpdate.estado = newStatus;
+                        updateAll();
+                        showToast(`Estado del remito ${idToUpdate} actualizado a "${newStatus}".`);
+                    }
+                }
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                updateAll();
+            });
+            
+            formAddCliente.addEventListener('submit', e => {
+                e.preventDefault();
+                const newCliente = newClienteInput.value.trim();
+                if(newCliente && !state.clientes.some(c => c.toLowerCase() === newCliente.toLowerCase())) {
+                    state.clientes.push(newCliente);
+                    newClienteInput.value = '';
+                    updateAll();
+                    showToast('Cliente agregado.');
+                } else {
+                    showToast('Error: El cliente ya existe o el nombre es inválido.', 'error');
+                }
+            });
+            
+            clientesList.addEventListener('click', e => {
+                const deleteBtn = e.target.closest('.delete-cliente-btn');
+                 if(deleteBtn) {
+                    const clienteToDelete = deleteBtn.dataset.cliente;
+                    state.clientes = state.clientes.filter(c => c !== clienteToDelete);
+                    updateAll();
+                    showToast('Cliente eliminado.');
+                }
+            });
+
+             formAddEstado.addEventListener('submit', e => {
+                e.preventDefault();
+                const newEstado = newEstadoInput.value.trim();
+                if(newEstado && !state.estados.some(s => s.toLowerCase() === newEstado.toLowerCase())) {
+                    state.estados.push(newEstado);
+                    newEstadoInput.value = '';
+                    updateAll();
+                    showToast('Estado agregado.');
+                } else {
+                     showToast('Error: El estado ya existe o el nombre es inválido.', 'error');
+                }
+            });
+
+            estadosList.addEventListener('click', e => {
+                const deleteBtn = e.target.closest('.delete-estado-btn');
+                 if(deleteBtn) {
+                    const estadoToDelete = deleteBtn.dataset.estado;
+                    state.estados = state.estados.filter(s => s !== estadoToDelete);
+                    updateAll();
+                    showToast('Estado eliminado.');
+                }
+            });
+            
+            // --- INICIALIZACIÓN ---
+            loadData();
+            updateAll();
+        });
+    </script>
+</body>
+</html>
+
